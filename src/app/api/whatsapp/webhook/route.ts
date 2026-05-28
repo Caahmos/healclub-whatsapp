@@ -305,7 +305,20 @@ async function handleStatusUpdate(status: {
   status: string
   timestamp: string
   recipient_id: string
+  errors?: Array<{
+    code: number
+    title: string
+    message: string
+    error_data?: { details?: string }
+  }>
 }) {
+  if (status.status === 'failed') {
+    console.error(
+      '[webhook] Message delivery failed. Status payload:',
+      JSON.stringify(status, null, 2),
+    )
+  }
+
   // 1) Mirror onto messages (legacy behavior) — Meta's status values
   //    already match the CHECK constraint on messages.status.
   const { error: msgErr } = await supabaseAdmin()
