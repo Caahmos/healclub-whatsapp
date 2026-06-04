@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Contact, CustomField, MessageTemplate } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -25,6 +26,8 @@ interface Step3Props {
   template: MessageTemplate;
   variables: Record<string, VariableMapping>;
   onUpdate: (variables: Record<string, VariableMapping>) => void;
+  mediaUrl: string;
+  onMediaUrlChange: (url: string) => void;
   onNext: () => void;
   onBack: () => void;
 }
@@ -51,6 +54,8 @@ export function Step3Personalize({
   template,
   variables,
   onUpdate,
+  mediaUrl,
+  onMediaUrlChange,
   onNext,
   onBack,
 }: Step3Props) {
@@ -129,6 +134,10 @@ export function Step3Personalize({
     return missing;
   }, [placeholders, variables]);
 
+  const hasMediaHeader = useMemo(() => {
+    return ['image', 'video', 'document'].includes(template.header_type || '');
+  }, [template.header_type]);
+
   function updateVariable(key: string, patch: Partial<VariableMapping>) {
     const current = variables[key] ?? { type: 'static' as VariableType, value: '' };
     onUpdate({
@@ -192,6 +201,23 @@ export function Step3Personalize({
           values.
         </p>
       </div>
+
+      {hasMediaHeader && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 space-y-2">
+          <Label className="text-xs text-slate-300">
+            Header {template.header_type?.charAt(0).toUpperCase()}{template.header_type?.slice(1)} URL
+          </Label>
+          <Input
+            value={mediaUrl}
+            onChange={(e) => onMediaUrlChange(e.target.value)}
+            placeholder={`https://example.com/path/to/your/${template.header_type}`}
+            className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+          />
+          <p className="text-xs text-slate-400">
+            This template requires a media header. Provide a public URL for the {template.header_type}.
+          </p>
+        </div>
+      )}
 
       {placeholders.length === 0 ? (
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6 text-center">
@@ -322,12 +348,37 @@ export function Step3Personalize({
         </div>
         <div className="rounded-lg bg-[#0e1a12] p-3">
           <div className="ml-auto max-w-[85%] rounded-lg bg-primary/30 px-3 py-2 shadow-sm">
+            {hasMediaHeader && mediaUrl.trim() && (
+              <div className="mb-2 overflow-hidden rounded bg-black/20">
+                {template.header_type === 'image' ? (
+                  <img
+                    src={mediaUrl}
+                    alt="Header Image"
+                    className="max-h-48 w-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded text-slate-300">
+                    <span className="font-semibold capitalize text-xs">{template.header_type}:</span>
+                    <span className="truncate text-xs max-w-[120px]">{mediaUrl.split('/').pop()}</span>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="whitespace-pre-wrap text-sm text-primary">
               {previewText}
             </p>
           </div>
         </div>
       </div>
+
+      {hasMediaHeader && !mediaUrl.trim() && (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+          Provide a media URL for the {template.header_type} header before continuing.
+        </div>
+      )}
 
       {unmappedKeys.length > 0 && (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
@@ -350,7 +401,7 @@ export function Step3Personalize({
         </Button>
         <Button
           onClick={onNext}
-          disabled={unmappedKeys.length > 0}
+          disabled={unmappedKeys.length > 0 || (hasMediaHeader && !mediaUrl.trim())}
           className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           Next

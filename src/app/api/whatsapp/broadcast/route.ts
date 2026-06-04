@@ -76,6 +76,7 @@ export async function POST(request: Request) {
       template_name,
       template_language,
       template_params,
+      media_url,
     } = body
 
     // Normalize to a list of {phone, params} regardless of shape.
@@ -125,6 +126,22 @@ export async function POST(request: Request) {
 
     const accessToken = decrypt(config.access_token)
 
+    // Fetch template to determine header type
+    let headerType: 'image' | 'video' | 'document' | undefined
+    if (template_name) {
+      const { data: templateRecord } = await supabase
+        .from('message_templates')
+        .select('header_type')
+        .eq('user_id', user.id)
+        .eq('name', template_name)
+        .eq('language', template_language || 'en_US')
+        .maybeSingle()
+
+      if (templateRecord?.header_type && ['image', 'video', 'document'].includes(templateRecord.header_type)) {
+        headerType = templateRecord.header_type as 'image' | 'video' | 'document'
+      }
+    }
+
     const results: BroadcastResult[] = []
     let sentCount = 0
     let failedCount = 0
@@ -157,6 +174,8 @@ export async function POST(request: Request) {
             templateName: template_name,
             language: template_language || 'en_US',
             params: recipient.params ?? [],
+            mediaUrl: media_url || undefined,
+            mediaType: headerType,
           })
           sentMessageId = result.messageId
           lastError = null

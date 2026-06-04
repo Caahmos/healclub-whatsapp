@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       content_text,
       media_url,
       template_name,
+      template_language,
       template_params,
       reply_to_message_id,
     } = body
@@ -169,6 +170,22 @@ export async function POST(request: Request) {
       }
     }
 
+    // Fetch template to determine header type
+    let headerType: 'image' | 'video' | 'document' | undefined
+    if (message_type === 'template') {
+      const { data: templateRecord } = await supabase
+        .from('message_templates')
+        .select('header_type')
+        .eq('user_id', user.id)
+        .eq('name', template_name)
+        .eq('language', template_language || 'en_US')
+        .maybeSingle()
+
+      if (templateRecord?.header_type && ['image', 'video', 'document'].includes(templateRecord.header_type)) {
+        headerType = templateRecord.header_type as 'image' | 'video' | 'document'
+      }
+    }
+
     // Send via Meta API — retry with phone-number variants if Meta rejects
     // with "recipient not in allowed list" (common in sandbox / when a
     // number was registered with/without a trunk 0). If an alternate
@@ -184,7 +201,10 @@ export async function POST(request: Request) {
           accessToken,
           to: phone,
           templateName: template_name,
+          language: template_language || 'en_US',
           params: template_params || [],
+          mediaUrl: media_url || undefined,
+          mediaType: headerType,
           contextMessageId,
         })
         return result.messageId

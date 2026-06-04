@@ -25,7 +25,7 @@ import {
 interface TemplatePickerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect: (template: MessageTemplate, params: string[]) => void;
+  onSelect: (template: MessageTemplate, params: string[], mediaUrl?: string) => void;
 }
 
 // Meta numbers template placeholders from 1 ({{1}}, {{2}}, …) and the
@@ -57,6 +57,7 @@ export function TemplatePicker({
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<MessageTemplate | null>(null);
   const [params, setParams] = useState<string[]>([]);
+  const [mediaUrl, setMediaUrl] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -106,31 +107,37 @@ export function TemplatePicker({
     if (!next) {
       setSelected(null);
       setParams([]);
+      setMediaUrl("");
     }
     onOpenChange(next);
   }
 
   function pickTemplate(template: MessageTemplate) {
     const vars = extractVariables(template.body_text);
-    if (vars.length === 0) {
+    const hasMediaHeader = ["image", "video", "document"].includes(template.header_type || "");
+
+    if (vars.length === 0 && !hasMediaHeader) {
       onSelect(template, []);
       handleOpenChange(false);
       return;
     }
     setSelected(template);
     setParams(new Array(vars.length).fill(""));
+    setMediaUrl("");
   }
 
   function confirm() {
     if (!selected) return;
-    onSelect(selected, params);
+    onSelect(selected, params, mediaUrl || undefined);
     handleOpenChange(false);
   }
 
   const variables = selected ? extractVariables(selected.body_text) : [];
+  const hasMediaHeader = selected ? ["image", "video", "document"].includes(selected.header_type || "") : false;
   const canConfirm =
     !!selected &&
-    variables.every((_, i) => (params[i] ?? "").trim().length > 0);
+    variables.every((_, i) => (params[i] ?? "").trim().length > 0) &&
+    (!hasMediaHeader || mediaUrl.trim().length > 0);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -207,6 +214,19 @@ export function TemplatePicker({
                 </p>
               )}
             </div>
+            {hasMediaHeader && (
+              <div className="space-y-1">
+                <Label className="text-xs text-slate-300">
+                  {`Header ${selected.header_type?.charAt(0).toUpperCase()}${selected.header_type?.slice(1)} URL`}
+                </Label>
+                <Input
+                  value={mediaUrl}
+                  onChange={(e) => setMediaUrl(e.target.value)}
+                  placeholder={`https://example.com/path/to/your/${selected.header_type}`}
+                  className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+                />
+              </div>
+            )}
             {variables.map((v, i) => (
               <div key={v} className="space-y-1">
                 <Label className="text-xs text-slate-300">{`Variable {{${v}}}`}</Label>

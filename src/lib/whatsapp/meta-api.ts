@@ -120,6 +120,8 @@ export interface SendTemplateMessageArgs {
   templateName: string
   language?: string
   params?: string[]
+  mediaUrl?: string
+  mediaType?: 'image' | 'video' | 'document'
   /** Meta's message_id of the message being replied to. */
   contextMessageId?: string
 }
@@ -138,6 +140,8 @@ export async function sendTemplateMessage(
     templateName,
     language = 'en_US',
     params,
+    mediaUrl,
+    mediaType,
     contextMessageId,
   } = args
   const url = `${META_API_BASE}/${phoneNumberId}/messages`
@@ -147,13 +151,31 @@ export async function sendTemplateMessage(
     language: { code: language },
   }
 
+  const components: any[] = []
+
+  if (mediaUrl && mediaType && ['image', 'video', 'document'].includes(mediaType)) {
+    components.push({
+      type: 'header',
+      parameters: [
+        {
+          type: mediaType,
+          [mediaType]: {
+            link: mediaUrl,
+          },
+        },
+      ],
+    })
+  }
+
   if (params && params.length > 0) {
-    template.components = [
-      {
-        type: 'body',
-        parameters: params.map((p) => ({ type: 'text', text: String(p) })),
-      },
-    ]
+    components.push({
+      type: 'body',
+      parameters: params.map((p) => ({ type: 'text', text: String(p) })),
+    })
+  }
+
+  if (components.length > 0) {
+    template.components = components
   }
 
   const body: Record<string, unknown> = {
